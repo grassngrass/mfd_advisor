@@ -1,0 +1,402 @@
+{% extends "base.html" %}
+{% block title %}Portfolio — FundAdvisor{% endblock %}
+{% block page_title %}<span id="portfolioTitle">Portfolio</span>{% endblock %}
+
+{% block content %}
+<div class="page-actions">
+  <a href="/clients" class="btn btn-ghost">← Back to Clients</a>
+  <button class="btn btn-primary" onclick="openAddInvModal()">+ Add Fund</button>
+  <button class="btn btn-green" onclick="downloadReport()">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    PDF Report
+  </button>
+</div>
+
+<div class="client-info-bar" id="clientInfoBar">
+  <div class="cib-avatar" id="cibAvatar">?</div>
+  <div class="cib-details">
+    <div class="cib-name" id="cibName">Loading…</div>
+    <div class="cib-meta" id="cibMeta"></div>
+  </div>
+  <div class="cib-stats" id="cibStats"></div>
+</div>
+
+
+<div class="tab-bar">
+  <button class="tab-btn active" onclick="switchTab('analysis', this)">📊 Analysis</button>
+  <button class="tab-btn" onclick="switchTab('investments', this)">💼 Holdings</button>
+  <button class="tab-btn" onclick="switchTab('risk', this)">⚖️ Risk Profile</button>
+  <button class="tab-btn" onclick="switchTab('recommendations', this)">🧠 AI Insights</button>
+  <button class="tab-btn" onclick="switchTab('wealth', this)">📈 Wealth Forecast</button>
+</div>
+
+
+<div class="tab-panel active" id="tab-analysis">
+  <div class="analysis-grid">
+    <div class="card score-card">
+      <div class="score-label">Diversification Score</div>
+      <div class="score-ring-wrap">
+        <canvas id="scoreGauge" width="180" height="180"></canvas>
+        <div class="score-center">
+          <div class="score-num" id="scoreNum">—</div>
+          <div class="score-sub">/ 100</div>
+        </div>
+      </div>
+      <div class="score-verdict" id="scoreVerdict"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><span class="card-title">Category Allocation</span></div>
+      <div class="chart-wrap" style="height:240px">
+        <canvas id="catPieChart"></canvas>
+      </div>
+    </div>
+
+    <div class="card full-width">
+      <div class="card-header"><span class="card-title">Portfolio Insights</span></div>
+      <div id="insightsList" class="insights-list"></div>
+    </div>
+  </div>
+</div>
+
+
+<div class="tab-panel" id="tab-investments">
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Fund Holdings</span>
+      <button class="btn btn-primary btn-sm" onclick="openAddInvModal()">+ Add Fund</button>
+    </div>
+    <table class="data-table" id="invTable">
+      <thead><tr><th>Fund Name</th><th>Category</th><th>Amount</th><th>Date</th><th>Exp. Return</th><th>Actions</th></tr></thead>
+      <tbody id="invTbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="tab-panel" id="tab-risk">
+  <div class="risk-grid">
+    <div class="card risk-card" id="riskCard">
+      <div class="risk-label">Risk Profile</div>
+      <div class="risk-profile-name" id="riskProfileName">—</div>
+      <div class="risk-score-bar-wrap">
+        <div class="risk-score-bar" id="riskScoreBar"><div class="risk-score-fill" id="riskScoreFill"></div></div>
+        <div class="risk-score-labels"><span>Conservative</span><span>Moderate</span><span>Aggressive</span></div>
+      </div>
+      <div class="risk-desc" id="riskDesc"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><span class="card-title">Risk Factors</span></div>
+      <div id="riskFactors" class="risk-factors"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><span class="card-title">Suggested Allocation</span></div>
+      <div class="chart-wrap" style="height:220px">
+        <canvas id="riskAllocChart"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="tab-panel" id="tab-recommendations">
+  <div class="recs-grid">
+    <div class="card full-width">
+      <div class="card-header"><span class="card-title">AI Recommendations</span></div>
+      <div id="recsList" class="recs-list"></div>
+    </div>
+    <div class="card full-width">
+      <div class="card-header"><span class="card-title">Suggested Funds</span></div>
+      <div id="fundSuggestions" class="fund-suggestions"></div>
+    </div>
+  </div>
+</div>
+
+<div class="tab-panel" id="tab-wealth">
+  <div class="wealth-controls">
+    <label>Projection Period: <strong id="yearsLabel">10</strong> years</label>
+    <input type="range" min="1" max="30" value="10" id="yearsSlider" oninput="updateYears(this.value)">
+  </div>
+  <div class="wealth-grid">
+    <div class="stat-card wealth-stat" id="ws1">
+      <div class="stat-icon blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg></div>
+      <div class="stat-content"><div class="stat-label">Currently Invested</div><div class="stat-value" id="wcurrent">—</div></div>
+    </div>
+    <div class="stat-card wealth-stat" id="ws2">
+      <div class="stat-icon green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="23,6 13.5,15.5 8.5,10.5 1,18"/><polyline points="17,6 23,6 23,12"/></svg></div>
+      <div class="stat-content"><div class="stat-label">Projected Value</div><div class="stat-value" id="wfuture">—</div></div>
+    </div>
+    <div class="stat-card wealth-stat" id="ws3">
+      <div class="stat-icon amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></div>
+      <div class="stat-content"><div class="stat-label">Total Gain</div><div class="stat-value" id="wgain">—</div></div>
+    </div>
+    <div class="stat-card wealth-stat" id="ws4">
+      <div class="stat-icon purple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div>
+      <div class="stat-content"><div class="stat-label">CAGR</div><div class="stat-value" id="wcagr">—</div></div>
+    </div>
+  </div>
+  <div class="card" style="margin-top:20px">
+    <div class="card-header"><span class="card-title">Growth Projection Chart</span></div>
+    <div class="chart-wrap" style="height:300px">
+      <canvas id="wealthChart"></canvas>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="addInvModal">
+  <div class="modal-header">
+    <h2 class="modal-title">Add Fund to Portfolio</h2>
+    <button class="modal-close" onclick="closeModal()">✕</button>
+  </div>
+  <form id="addInvForm">
+    <input type="hidden" name="client_id" id="invClientId" value="{{ client_id }}">
+    <div class="form-grid">
+      <div class="form-group full">
+        <label>Fund Name *</label>
+        <input type="text" name="fund_name" required placeholder="e.g. Axis Bluechip Fund">
+      </div>
+      <div class="form-group">
+        <label>Amount Invested (₹) *</label>
+        <input type="number" name="amount" required min="100" step="100" placeholder="50000">
+      </div>
+      <div class="form-group">
+        <label>Category *</label>
+        <select name="category" required>
+          <option value="">Select category</option>
+          <option>Large Cap</option><option>Mid Cap</option><option>Small Cap</option>
+          <option>Flexi Cap</option><option>ELSS</option><option>Index</option>
+          <option>Hybrid</option><option>Debt</option><option>Gold</option><option>International</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Investment Date *</label>
+        <input type="date" name="date" required>
+      </div>
+      <div class="form-group">
+        <label>Expected Annual Return (%)</label>
+        <input type="number" name="expected_return" min="1" max="40" step="0.5" value="12">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button type="submit" class="btn btn-primary">Add Fund</button>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const CLIENT_ID = {{ client_id }};
+let wealthChart = null;
+
+async function loadAll() {
+  const client = await apiFetch(`/api/clients/${CLIENT_ID}`);
+  document.getElementById("portfolioTitle").textContent = client.name + "'s Portfolio";
+  document.getElementById("cibAvatar").textContent = client.name[0];
+  document.getElementById("cibName").textContent = client.name;
+  document.getElementById("cibMeta").textContent = `${client.email}  •  Age: ${client.age||'N/A'}  •  Income: ${client.income ? formatCurrency(client.income)+'/yr' : 'N/A'}`;
+
+  const analysis = await apiFetch(`/api/analyze/${CLIENT_ID}`);
+  document.getElementById("cibStats").innerHTML = `
+    <div class="cib-stat"><div class="cib-stat-val">${formatCurrency(analysis.total_invested)}</div><div class="cib-stat-label">Total AUM</div></div>
+    <div class="cib-stat"><div class="cib-stat-val">${analysis.fund_count}</div><div class="cib-stat-label">Funds</div></div>
+    <div class="cib-stat"><div class="cib-stat-val">${analysis.diversification_score}/100</div><div class="cib-stat-label">Diversity</div></div>
+  `;
+
+  drawScore(analysis.diversification_score);
+  drawCatPie(analysis.category_distribution);
+  renderInsights(analysis.insights, analysis.alerts);
+
+  loadInvestments();
+
+  const risk = await apiFetch(`/api/risk/${CLIENT_ID}`);
+  renderRisk(risk);
+
+  const recs = await apiFetch(`/api/recommend/${CLIENT_ID}`);
+  renderRecs(recs);
+
+  loadWealth(10);
+}
+
+function drawScore(score) {
+  document.getElementById("scoreNum").textContent = score;
+  const verdict = score >= 75 ? "Excellent" : score >= 50 ? "Moderate" : "Needs Work";
+  const vColor = score >= 75 ? "#16a34a" : score >= 50 ? "#d97706" : "#dc2626";
+  document.getElementById("scoreVerdict").innerHTML = `<span style="color:${vColor}">${verdict}</span>`;
+  const canvas = document.getElementById("scoreGauge");
+  const ctx = canvas.getContext("2d");
+  const cx = 90, cy = 90, r = 70;
+  ctx.clearRect(0, 0, 180, 180);
+  ctx.beginPath(); ctx.arc(cx, cy, r, Math.PI * 0.75, Math.PI * 2.25, false);
+  ctx.strokeStyle = "#e2e8f0"; ctx.lineWidth = 14; ctx.lineCap = "round"; ctx.stroke();
+  const pct = score / 100;
+  const end = Math.PI * 0.75 + pct * Math.PI * 1.5;
+  const grad = ctx.createLinearGradient(cx - r, cy, cx + r, cy);
+  grad.addColorStop(0, "#2563eb"); grad.addColorStop(1, "#0d9488");
+  ctx.beginPath(); ctx.arc(cx, cy, r, Math.PI * 0.75, end, false);
+  ctx.strokeStyle = grad; ctx.lineWidth = 14; ctx.stroke();
+}
+
+function drawCatPie(catDist) {
+  const labels = Object.keys(catDist);
+  const data   = labels.map(k => catDist[k].amount);
+  const PALETTE = ["#2563eb","#0d9488","#d97706","#8b5cf6","#ef4444","#059669","#f59e0b","#6366f1","#ec4899","#14b8a6"];
+  new Chart(document.getElementById("catPieChart"), {
+    type: "doughnut",
+    data: { labels, datasets: [{ data, backgroundColor: PALETTE, borderWidth: 2, borderColor: "#fff", hoverOffset: 8 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: "55%",
+      plugins: {
+        legend: { position: "right", labels: { font: { family:"DM Sans", size:10 }, padding:10 } },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ₹${formatNum(ctx.raw)} (${catDist[ctx.label].percent}%)` } }
+      }
+    }
+  });
+}
+
+function renderInsights(insights, alerts) {
+  const el = document.getElementById("insightsList");
+  const items = [...(alerts||[]).map(a => ({ text: a, type: "alert" })), ...(insights||[]).map(i => ({ text: i, type: "info" }))];
+  el.innerHTML = items.map(i => `<div class="insight-item ${i.type}">${i.text}</div>`).join("") || '<div class="empty-cell">No insights yet</div>';
+}
+
+async function loadInvestments() {
+  const invs = await apiFetch(`/api/investments/${CLIENT_ID}`);
+  const tbody = document.getElementById("invTbody");
+  tbody.innerHTML = invs.map(i => `
+    <tr>
+      <td><strong>${i.fund_name}</strong></td>
+      <td><span class="cat-badge">${i.category}</span></td>
+      <td>${formatCurrency(i.amount)}</td>
+      <td>${i.date}</td>
+      <td>${i.expected_return}%</td>
+      <td><button class="icon-btn red" onclick="deleteInv(${i.id})">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3,6 5,6 21,6"/><path d="M19 6l-1 14H6L5 6"/></svg>
+      </button></td>
+    </tr>
+  `).join("") || '<tr><td colspan="6" class="empty-cell">No investments yet</td></tr>';
+}
+
+async function deleteInv(id) {
+  if (!confirm("Delete this investment?")) return;
+  await apiFetch(`/api/investments/${id}`, { method: "DELETE" });
+  showToast("Investment removed", "error");
+  loadAll();
+}
+
+function renderRisk(risk) {
+  document.getElementById("riskProfileName").textContent = risk.profile;
+  document.getElementById("riskProfileName").style.color = risk.color;
+  document.getElementById("riskDesc").textContent = risk.description;
+  const fill = document.getElementById("riskScoreFill");
+  const pct  = Math.min(100, (risk.score / 100) * 100);
+  fill.style.width = pct + "%";
+  fill.style.background = risk.color;
+  document.getElementById("riskFactors").innerHTML = Object.entries(risk.factors).map(([k,v]) =>
+    `<div class="risk-factor-row"><span class="rf-label">${k.replace("_"," ").toUpperCase()}</span><span class="rf-val">${typeof v === "number" && k === "income" ? formatCurrency(v) : v}</span></div>`
+  ).join("");
+  const labels = Object.keys(risk.suggested_allocation);
+  const data   = Object.values(risk.suggested_allocation);
+  const PALETTE = ["#2563eb","#0d9488","#d97706","#8b5cf6","#ef4444","#059669"];
+  new Chart(document.getElementById("riskAllocChart"), {
+    type: "bar",
+    data: { labels, datasets: [{ data, backgroundColor: PALETTE, borderRadius: 4 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { family:"DM Sans", size:9 } } },
+        y: { ticks: { callback: v => v + "%" }, max: 60, grid: { color: "#f1f5f9" } }
+      }
+    }
+  });
+}
+
+function renderRecs(recs) {
+  const typeColors = { warning: "#fef3c7", suggestion: "#dbeafe", success: "#d1fae5", tax: "#ede9fe", info: "#f0f9ff", alert: "#fee2e2" };
+  document.getElementById("recsList").innerHTML = (recs.recommendations || []).map(r => `
+    <div class="rec-item" style="border-left-color:${r.type==='warning'?'#d97706':r.type==='success'?'#16a34a':r.type==='tax'?'#8b5cf6':'#2563eb'}">
+      <div class="rec-title">${r.icon} ${r.title}</div>
+      <div class="rec-detail">${r.detail}</div>
+    </div>
+  `).join("") || '<div class="empty-cell">Add investments to get recommendations</div>';
+
+  document.getElementById("fundSuggestions").innerHTML = (recs.fund_suggestions || []).map(f => `
+    <div class="fund-card">
+      <div class="fund-cat">${f.category}</div>
+      <div class="fund-name">${f.fund}</div>
+      <div class="fund-reason">${f.reason}</div>
+    </div>
+  `).join("") || '<div class="empty-cell">No fund suggestions</div>';
+}
+
+async function loadWealth(years) {
+  const w = await apiFetch(`/api/wealth/${CLIENT_ID}?years=${years}`);
+  document.getElementById("wcurrent").textContent = formatCurrency(w.total_current);
+  document.getElementById("wfuture").textContent  = formatCurrency(w.total_future);
+  document.getElementById("wgain").textContent    = formatCurrency(w.total_gain);
+  document.getElementById("wcagr").textContent    = w.cagr + "%";
+  
+  const labels = w.timeline.map(t => `Yr ${t.year}`);
+  const values = w.timeline.map(t => t.value);
+  const invested = w.timeline.map(t => t.invested);
+
+  if (wealthChart) wealthChart.destroy();
+  wealthChart = new Chart(document.getElementById("wealthChart"), {
+    type: "line",
+    data: {
+      labels,
+      datasets: [
+        { label: "Portfolio Value", data: values, borderColor: "#2563eb", backgroundColor: "rgba(37,99,235,0.08)", fill: true, tension: 0.4, pointRadius: 3 },
+        { label: "Amount Invested", data: invested, borderColor: "#94a3b8", borderDash: [5,5], fill: false, tension: 0, pointRadius: 0 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { labels: { font: { family:"DM Sans" } } }, tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ₹${formatNum(ctx.raw)}` } } },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { family:"DM Sans", size:10 } } },
+        y: { grid: { color: "#f1f5f9" }, ticks: { callback: v => "₹"+formatNum(v), font: { family:"DM Sans", size:10 } } }
+      }
+    }
+  });
+}
+
+function updateYears(y) {
+  document.getElementById("yearsLabel").textContent = y;
+  loadWealth(parseInt(y));
+}
+
+function switchTab(name, btn) {
+  document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+  document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+  btn.classList.add("active");
+  document.getElementById("tab-" + name).classList.add("active");
+}
+
+function openAddInvModal() {
+  document.getElementById("addInvForm").reset();
+  document.getElementById("invClientId").value = CLIENT_ID;
+  document.querySelector("input[name=date]").valueAsDate = new Date();
+  openModal("addInvModal");
+}
+
+document.getElementById("addInvForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const body = Object.fromEntries(fd);
+  body.amount = parseFloat(body.amount);
+  body.expected_return = parseFloat(body.expected_return) || 12;
+  const r = await apiFetch("/api/investments", { method: "POST", body: JSON.stringify(body) });
+  if (r.success) { closeModal(); showToast("Fund added!", "success"); loadAll(); }
+});
+
+async function downloadReport() {
+  showToast("Generating PDF report…", "info");
+  window.location.href = `/api/report/${CLIENT_ID}`;
+}
+
+loadAll();
+</script>
+{% endblock %}

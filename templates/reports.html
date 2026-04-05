@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Reports — FundAdvisor{% endblock %}
+{% block page_title %}Reports{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">Generate Client Reports</span>
+    <span class="text-muted" style="font-size:13px">PDF reports with full portfolio analysis</span>
+  </div>
+  <table class="data-table" id="reportsTable">
+    <thead><tr><th>Client</th><th>Email</th><th>Funds</th><th>AUM</th><th>Risk</th><th>Generate</th></tr></thead>
+    <tbody id="reportsTbody"><tr><td colspan="6" class="loading-cell"><div class="spinner"></div></td></tr></tbody>
+  </table>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function loadReports() {
+  const clients = await apiFetch("/api/clients");
+  const tbody = document.getElementById("reportsTbody");
+  tbody.innerHTML = clients.map(c => `
+    <tr>
+      <td><div class="client-name-cell"><div class="avatar-sm">${c.name[0]}</div><strong>${c.name}</strong></div></td>
+      <td class="text-muted">${c.email}</td>
+      <td>${c.fund_count}</td>
+      <td>${formatCurrency(c.total_invested)}</td>
+      <td><span class="badge badge-${(c.risk_appetite||'Moderate').toLowerCase()}">${c.risk_appetite||'Moderate'}</span></td>
+      <td>
+        <div style="display:flex;gap:8px">
+          <a href="/portfolio/${c.id}" class="btn btn-ghost btn-sm">View</a>
+          <button class="btn btn-primary btn-sm" onclick="downloadPDF(${c.id}, '${c.name}')">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            PDF
+          </button>
+        </div>
+      </td>
+    </tr>
+  `).join("") || '<tr><td colspan="6" class="empty-cell">No clients yet</td></tr>';
+}
+
+function downloadPDF(id, name) {
+  showToast(`Generating report for ${name}…`, "info");
+  window.location.href = `/api/report/${id}`;
+}
+
+loadReports();
+</script>
+{% endblock %}

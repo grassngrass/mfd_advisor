@@ -1,0 +1,232 @@
+{% extends "base.html" %}
+{% block title %}Clients — FundAdvisor{% endblock %}
+{% block page_title %}Client Manager{% endblock %}
+
+{% block content %}
+<div class="page-actions">
+  <button class="btn btn-primary" onclick="openAddClientModal()">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    Add Client
+  </button>
+</div>
+
+<div class="card" style="margin-top:0">
+  <div class="card-header">
+    <span class="card-title">All Clients</span>
+    <input class="search-input" type="text" placeholder="Search clients..." oninput="filterClients(this.value)">
+  </div>
+  <table class="data-table" id="clientsTable">
+    <thead>
+      <tr>
+        <th>Client</th><th>Email</th><th>Age</th><th>Risk</th><th>Funds</th><th>AUM</th><th>Actions</th>
+      </tr>
+    </thead>
+    <tbody id="clientsTbody">
+      <tr><td colspan="7" class="loading-cell"><div class="spinner"></div></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="modal" id="addClientModal">
+  <div class="modal-header">
+    <h2 class="modal-title">Add New Client</h2>
+    <button class="modal-close" onclick="closeModal()">✕</button>
+  </div>
+  <form id="addClientForm">
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Full Name *</label>
+        <input type="text" name="name" required placeholder="e.g. Rajesh Kumar">
+      </div>
+      <div class="form-group">
+        <label>Email *</label>
+        <input type="email" name="email" required placeholder="rajesh@email.com">
+      </div>
+      <div class="form-group">
+        <label>Age</label>
+        <input type="number" name="age" min="18" max="100" placeholder="35">
+      </div>
+      <div class="form-group">
+        <label>Annual Income (₹)</label>
+        <input type="number" name="income" min="0" step="10000" placeholder="800000">
+      </div>
+      <div class="form-group full">
+        <label>Risk Appetite</label>
+        <div class="radio-group">
+          <label class="radio-label"><input type="radio" name="risk_appetite" value="Conservative"> Conservative</label>
+          <label class="radio-label"><input type="radio" name="risk_appetite" value="Moderate" checked> Moderate</label>
+          <label class="radio-label"><input type="radio" name="risk_appetite" value="Aggressive"> Aggressive</label>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button type="submit" class="btn btn-primary">Add Client</button>
+    </div>
+  </form>
+</div>
+
+<div class="modal" id="addInvModal">
+  <div class="modal-header">
+    <h2 class="modal-title">Add Investment</h2>
+    <button class="modal-close" onclick="closeModal()">✕</button>
+  </div>
+  <form id="addInvForm">
+    <input type="hidden" name="client_id" id="invClientId">
+    <div class="form-grid">
+      <div class="form-group full">
+        <label>Fund Name *</label>
+        <input type="text" name="fund_name" required placeholder="e.g. Mirae Asset Large Cap Fund">
+      </div>
+      <div class="form-group">
+        <label>Amount Invested (₹) *</label>
+        <input type="number" name="amount" required min="100" step="100" placeholder="50000">
+      </div>
+      <div class="form-group">
+        <label>Category *</label>
+        <select name="category" required>
+          <option value="">Select category</option>
+          <option>Large Cap</option>
+          <option>Mid Cap</option>
+          <option>Small Cap</option>
+          <option>Flexi Cap</option>
+          <option>ELSS</option>
+          <option>Index</option>
+          <option>Hybrid</option>
+          <option>Debt</option>
+          <option>Gold</option>
+          <option>International</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Investment Date *</label>
+        <input type="date" name="date" required>
+      </div>
+      <div class="form-group">
+        <label>Expected Annual Return (%)</label>
+        <input type="number" name="expected_return" min="1" max="40" step="0.5" value="12" placeholder="12">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button type="submit" class="btn btn-primary">Add Fund</button>
+    </div>
+  </form>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+let allClients = [];
+
+async function loadClients() {
+  allClients = await apiFetch("/api/clients");
+  renderClients(allClients);
+}
+
+function renderClients(clients) {
+  const tbody = document.getElementById("clientsTbody");
+  if (!clients.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty-cell">No clients yet. Click "Add Client" to get started.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = clients.map(c => `
+    <tr>
+      <td>
+        <div class="client-name-cell">
+          <div class="avatar-sm">${c.name[0]}</div>
+          <div>
+            <div class="fw-600">${c.name}</div>
+            <div class="text-xs text-muted">Added ${new Date(c.created_at).toLocaleDateString('en-IN')}</div>
+          </div>
+        </div>
+      </td>
+      <td class="text-muted">${c.email}</td>
+      <td>${c.age || '—'}</td>
+      <td><span class="badge badge-${(c.risk_appetite||'Moderate').toLowerCase()}">${c.risk_appetite || 'Moderate'}</span></td>
+      <td>${c.fund_count}</td>
+      <td><strong>${formatCurrency(c.total_invested)}</strong></td>
+      <td>
+        <div class="action-btns">
+          <button class="icon-btn blue" onclick="openPortfolio(${c.id})" title="View Portfolio">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h18v5H3zM3 10h18v5H3zM3 17h7v4H3z"/></svg>
+          </button>
+          <button class="icon-btn green" onclick="openAddInvModal(${c.id})" title="Add Investment">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+          <button class="icon-btn red" onclick="deleteClient(${c.id}, '${c.name}')" title="Delete">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3,6 5,6 21,6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+          </button>
+        </div>
+      </td>
+    </tr>
+  `).join("");
+}
+
+function filterClients(q) {
+  const filtered = allClients.filter(c =>
+    c.name.toLowerCase().includes(q.toLowerCase()) ||
+    c.email.toLowerCase().includes(q.toLowerCase())
+  );
+  renderClients(filtered);
+}
+
+function openAddClientModal() {
+  document.getElementById("addClientForm").reset();
+  openModal("addClientModal");
+}
+
+function openAddInvModal(clientId) {
+  document.getElementById("addInvForm").reset();
+  document.getElementById("invClientId").value = clientId;
+  document.querySelector("input[name=date]").valueAsDate = new Date();
+  openModal("addInvModal");
+}
+
+function openPortfolio(clientId) {
+  window.location.href = `/portfolio/${clientId}`;
+}
+
+async function deleteClient(id, name) {
+  if (!confirm(`Delete client "${name}" and all their investments?`)) return;
+  await apiFetch(`/api/clients/${id}`, { method: "DELETE" });
+  showToast(`${name} deleted`, "error");
+  loadClients();
+}
+
+document.getElementById("addClientForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const body = Object.fromEntries(fd);
+  body.age    = body.age ? parseInt(body.age) : null;
+  body.income = body.income ? parseFloat(body.income) : null;
+  const r = await apiFetch("/api/clients", { method: "POST", body: JSON.stringify(body) });
+  if (r.success) {
+    closeModal();
+    showToast("Client added successfully!", "success");
+    loadClients();
+  } else {
+    showToast(r.error || "Error adding client", "error");
+  }
+});
+
+document.getElementById("addInvForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const body = Object.fromEntries(fd);
+  body.amount          = parseFloat(body.amount);
+  body.expected_return = parseFloat(body.expected_return) || 12;
+  const r = await apiFetch("/api/investments", { method: "POST", body: JSON.stringify(body) });
+  if (r.success) {
+    closeModal();
+    showToast("Investment added!", "success");
+    loadClients();
+  } else {
+    showToast("Error adding investment", "error");
+  }
+});
+
+loadClients();
+</script>
+{% endblock %}

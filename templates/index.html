@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — FundAdvisor{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="dashboard-grid">
+  <div class="stats-row">
+    <div class="stat-card" id="sc-clients">
+      <div class="stat-icon blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 014-4h4a4 4 0 014 4v2"/></svg></div>
+      <div class="stat-content">
+        <div class="stat-label">Total Clients</div>
+        <div class="stat-value" id="statClients">—</div>
+      </div>
+    </div>
+    <div class="stat-card" id="sc-aum">
+      <div class="stat-icon green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></div>
+      <div class="stat-content">
+        <div class="stat-label">Total AUM</div>
+        <div class="stat-value" id="statAUM">—</div>
+      </div>
+    </div>
+    <div class="stat-card" id="sc-funds">
+      <div class="stat-icon amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg></div>
+      <div class="stat-content">
+        <div class="stat-label">Fund Holdings</div>
+        <div class="stat-value" id="statFunds">—</div>
+      </div>
+    </div>
+    <div class="stat-card" id="sc-avg">
+      <div class="stat-icon purple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div>
+      <div class="stat-content">
+        <div class="stat-label">Avg. per Client</div>
+        <div class="stat-value" id="statAvg">—</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="charts-row">
+    <div class="card chart-card wide">
+      <div class="card-header">
+        <span class="card-title">AUM by Category</span>
+        <span class="card-badge">Live</span>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="categoryChart"></canvas>
+      </div>
+    </div>
+
+    <div class="card chart-card">
+      <div class="card-header">
+        <span class="card-title">Distribution</span>
+      </div>
+      <div class="chart-wrap donut-wrap">
+        <canvas id="donutChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="bottom-row">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Recent Clients</span>
+        <a href="/clients" class="link-btn">View All →</a>
+      </div>
+      <table class="mini-table" id="recentClientsTable">
+        <thead><tr><th>Client</th><th>Email</th><th>AUM</th><th></th></tr></thead>
+        <tbody id="recentClientsTbody"></tbody>
+      </table>
+    </div>
+
+    <div class="card quick-actions-card">
+      <div class="card-header"><span class="card-title">Quick Actions</span></div>
+      <div class="quick-actions">
+        <a href="/clients" class="qa-btn blue">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 10-16 0"/><path d="M12 8v4m2-2h-4" stroke-width="2"/></svg>
+          Add Client
+        </a>
+        <a href="/clients" class="qa-btn green">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 3h18v5H3zM3 10h18v5H3zM3 17h18v4H3z"/></svg>
+          View Portfolio
+        </a>
+        <a href="/reports" class="qa-btn amber">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
+          Generate Report
+        </a>
+      </div>
+
+      <div class="card-header" style="margin-top:20px"><span class="card-title">Platform Tips</span></div>
+      <div class="tips-list">
+        <div class="tip">💡 Add client age & income for accurate risk profiling</div>
+        <div class="tip">📊 Set expected returns per fund for better projections</div>
+        <div class="tip">📄 Generate PDF reports to share with clients</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const PALETTE = ["#2563eb","#0d9488","#d97706","#8b5cf6","#ef4444","#059669","#f59e0b","#6366f1","#ec4899","#14b8a6"];
+
+async function loadDashboard() {
+  const data = await apiFetch("/api/dashboard");
+  const { total_clients, total_aum, total_funds, category_distribution, recent_clients } = data;
+
+  document.getElementById("statClients").textContent = total_clients;
+  document.getElementById("statAUM").textContent = formatCurrency(total_aum);
+  document.getElementById("statFunds").textContent = total_funds;
+  document.getElementById("statAvg").textContent = total_clients ? formatCurrency(total_aum / total_clients) : "₹0";
+
+  const cats = category_distribution.map(c => c.category);
+  const amts = category_distribution.map(c => c.total);
+  new Chart(document.getElementById("categoryChart"), {
+    type: "bar",
+    data: {
+      labels: cats,
+      datasets: [{ label: "AUM (₹)", data: amts, backgroundColor: PALETTE, borderRadius: 6, borderSkipped: false }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => " ₹" + formatNum(ctx.raw) } } },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { family: "DM Sans", size: 11 } } },
+        y: { grid: { color: "#f1f5f9" }, ticks: { callback: v => "₹" + formatNum(v), font: { family: "DM Sans", size: 10 } } }
+      }
+    }
+  });
+
+  new Chart(document.getElementById("donutChart"), {
+    type: "doughnut",
+    data: {
+      labels: cats,
+      datasets: [{ data: amts, backgroundColor: PALETTE, borderWidth: 2, borderColor: "#fff", hoverOffset: 8 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      cutout: "65%",
+      plugins: {
+        legend: { position: "bottom", labels: { font: { family: "DM Sans", size: 10 }, padding: 12 } },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ₹${formatNum(ctx.raw)}` } }
+      }
+    }
+  });
+
+  const tbody = document.getElementById("recentClientsTbody");
+  tbody.innerHTML = recent_clients.map(c => `
+    <tr>
+      <td><div class="client-name-cell"><div class="mini-avatar">${c.name[0]}</div>${c.name}</div></td>
+      <td class="text-muted">${c.email}</td>
+      <td><strong>${formatCurrency(c.aum)}</strong></td>
+      <td><a href="/clients" class="table-link">View →</a></td>
+    </tr>
+  `).join("") || '<tr><td colspan="4" class="empty-cell">No clients yet</td></tr>';
+}
+
+loadDashboard();
+</script>
+{% endblock %}
